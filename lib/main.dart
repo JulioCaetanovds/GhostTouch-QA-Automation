@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'services/automation_driver.dart';
+import 'scripts/calculator_test.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,8 +12,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: Scaffold(
-        appBar: AppBar(title: const Text('GhostTouch QA 👻')),
+        appBar: AppBar(
+          title: const Text('GhostTouch QA 👻'),
+          backgroundColor: Colors.deepPurple,
+          foregroundColor: Colors.white,
+        ),
         body: const GhostControl(),
       ),
     );
@@ -27,186 +33,38 @@ class GhostControl extends StatefulWidget {
 }
 
 class _GhostControlState extends State<GhostControl> {
-  static const platform = MethodChannel(
-    'com.example.ghost_touch/accessibility',
-  );
+  // Instancia o Driver
+  final AutomationDriver _driver = AutomationDriver();
 
-  // Controladores para o input da conta
   final TextEditingController _calcInputController = TextEditingController();
 
-  String status = "Digite uma conta (ex: 7+9)";
-  String capturedResult = "";
+  String _status = "Pronto para testar.";
+  String _finalResult = "";
 
-  // Ações Básicas
-  Future<void> sendGlobalAction(String action) async {
-    try {
-      await platform.invokeMethod('globalAction', {'action': action});
-    } catch (e) {
-      print(e);
-    }
-  }
-
-  // Função para limpar a bagunça e achar o número
-  String _extractCleanResult(List<dynamic> rawTexts) {
-    // 1. Prioridade: Texto que o Android diz explicitamente ser o resultado
-    for (var text in rawTexts) {
-      String t = text.toString().toLowerCase();
-      if (t.contains("resultado") ||
-          t.contains("result") ||
-          t.contains("calculation")) {
-        // Remove tudo que não for número ou vírgula/ponto
-        // Ex: "168 resultado..." vira "168"
-        String numbersOnly = text.toString().replaceAll(
-          RegExp(r'[^0-9.,]'),
-          '',
-        );
-        return numbersOnly;
-      }
-    }
-
-    // 2. Fallback: Tenta achar o número puro (se a calc não disser "resultado")
-    // Geralmente o resultado é o texto mais longo que é puramente numérico
-    // e não é um botão isolado (tamanho > 1 ou contém ponto/vírgula)
-    for (var text in rawTexts) {
-      String t = text.toString();
-      // Se for um número e tiver mais de 1 dígito (ex: "168")
-      // Ou se for um número decimal (ex: "2.5")
-      if (double.tryParse(t.replaceAll(',', '.')) != null) {
-        if (t.length > 1 || t.contains(',') || t.contains('.')) {
-          return t;
-        }
-      }
-    }
-
-    return "Não identificado";
-  }
-
-  Future<void> runInteractiveCalc() async {
-    final input = _calcInputController.text.trim();
-    if (input.isEmpty) return;
-
+  // Método chamado pelo botão
+  Future<void> _startTest() async {
+    // Limpa estado anterior
     setState(() {
-      status = "Iniciando Automação...\nMinimize o app se necessário.";
-      capturedResult = "";
+      _status = "Inicializando...";
+      _finalResult = "";
     });
 
-    // 1. Vai para Home
-    await sendGlobalAction("HOME");
-    await Future.delayed(const Duration(seconds: 2));
+    // Instancia o Script de Teste injetando dependências
+    final testScript = CalculatorTest(
+      driver: _driver,
+      onStatusChanged: (newStatus) {
+        // Atualiza a UI a cada passo do script
+        setState(() => _status = newStatus);
+      },
+    );
 
-    try {
-      // 2. Abre a Calculadora
-      setState(() => status = "Abrindo Calculadora...");
-      // Se o nome do seu app for diferente, ajuste aqui (ex: Calculator)
-      try {
-        await platform.invokeMethod('clickByText', {'text': 'Calculadora'});
-      } catch (e) {
-        await platform.invokeMethod('clickByText', {'text': 'Calculator'});
-      }
+    // Roda o script e espera o resultado
+    final result = await testScript.run(_calcInputController.text.trim());
 
-      await Future.delayed(const Duration(seconds: 3));
-
-      // --- [NOVO] PASSO DE LIMPEZA ---
-      // Tenta clicar em tudo que possa significar "Limpar" para garantir conta nova
-      setState(() => status = "Limpando tela anterior...");
-      try {
-        await platform.invokeMethod('clickByText', {'text': 'AC'});
-      } catch (e) {} // All Clear
-      try {
-        await platform.invokeMethod('clickByText', {'text': 'C'});
-      } catch (e) {} // Clear
-      try {
-        await platform.invokeMethod('clickByText', {'text': 'Limpar'});
-      } catch (e) {}
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // 3. Digita a conta caractere por caractere
-      for (int i = 0; i < input.length; i++) {
-        String char = input[i];
-        String textToClick = char;
-
-        // --- [NOVO] TRADUÇÃO DE SÍMBOLOS ---
-        // Traduz do teclado do PC para os símbolos da Calculadora Android
-        if (char == '*') textToClick = '×';
-        if (char == '/') textToClick = '÷';
-        // O menos e mais geralmente são iguais, mas garantimos:
-        if (char == '-')
-          textToClick = '−'; // O menos matemático às vezes é diferente do hífen
-
-        setState(() => status = "Digitando: $textToClick");
-
-        try {
-          // Tenta clicar no símbolo traduzido
-          await platform.invokeMethod('clickByText', {'text': textToClick});
-        } catch (e) {
-          // SE FALHAR, tenta os nomes por extenso (Fallback)
-          print("Falha ao clicar em $textToClick, tentando nomes...");
-          if (char == '*')
-            await platform.invokeMethod('clickByText', {'text': 'Vezes'});
-          else if (char == '/')
-            await platform.invokeMethod('clickByText', {'text': 'Dividir'});
-          else if (char == '-')
-            await platform.invokeMethod('clickByText', {
-              'text': 'Menos',
-            }); // Tenta "Menos" se o símbolo falhar
-          else if (char == '-')
-            await platform.invokeMethod('clickByText', {
-              'text': '-',
-            }); // Tenta o hífen normal
-          else if (char == '+')
-            await platform.invokeMethod('clickByText', {'text': 'Mais'});
-        }
-        await Future.delayed(const Duration(milliseconds: 600));
-      }
-
-      // 4. Clica em Igual
-      setState(() => status = "Calculando...");
-      try {
-        await platform.invokeMethod('clickByText', {'text': '='});
-      } catch (e) {
-        await platform.invokeMethod('clickByText', {'text': 'Igual'});
-      }
-
-      // Aumentei o tempo para dar tempo da animação do resultado terminar
-      await Future.delayed(const Duration(seconds: 4));
-
-      // 5. LÊ A TELA (Scraping)
-      setState(() => status = "Lendo resultado...");
-      final List<dynamic> screenTexts = await platform.invokeMethod(
-        'readScreen',
-      );
-
-      // GUARA O LOG BRUTO (para debug)
-      capturedResult = screenTexts.join(" | ");
-
-      // EXTRAI O OURO (O número limpo)
-      String cleanNumber = _extractCleanResult(screenTexts);
-
-      // 6. VOLTA PARA O NOSSO APP
-      setState(() => status = "Voltando... Resultado detectado: $cleanNumber");
-      await sendGlobalAction("RECENTS");
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Tenta achar o app no Recents
-      bool voltou = false;
-      try {
-        await platform.invokeMethod('clickByText', {'text': 'GhostTouch QA'});
-        voltou = true;
-      } catch (e) {}
-
-      if (!voltou) {
-        try {
-          await platform.invokeMethod('clickByText', {'text': 'GhostTouch'});
-        } catch (e) {
-          // Fallback: Clica no meio da tela
-          await platform.invokeMethod('click', {'x': 500.0, 'y': 1000.0});
-        }
-      }
-
-      setState(() => status = "Ciclo Concluído!");
-    } catch (e) {
-      setState(() => status = "Erro: $e");
-    }
+    // Atualiza resultado final
+    setState(() {
+      _finalResult = result;
+    });
   }
 
   @override
@@ -215,22 +73,32 @@ class _GhostControlState extends State<GhostControl> {
       padding: const EdgeInsets.all(20.0),
       child: Column(
         children: [
-          const Icon(Icons.calculate_outlined, size: 50, color: Colors.teal),
+          const Icon(
+            Icons.touch_app_rounded,
+            size: 60,
+            color: Colors.deepPurple,
+          ),
           const SizedBox(height: 10),
           const Text(
-            "Automação Bidirecional",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            "Automação Híbrida",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 20),
+          const Text(
+            "Flutter + Android Accessibility Service",
+            style: TextStyle(color: Colors.grey),
+          ),
+
+          const SizedBox(height: 30),
 
           TextField(
             controller: _calcInputController,
             keyboardType:
-                TextInputType.visiblePassword, // Teclado numérico com símbolos
+                TextInputType.visiblePassword, // Garante teclado completo
             decoration: const InputDecoration(
-              labelText: 'Digite a conta (ex: 15+25)',
+              labelText: 'Digite a conta (ex: 42*4)',
               border: OutlineInputBorder(),
-              helperText: 'Use apenas números simples e + - / *',
+              prefixIcon: Icon(Icons.calculate),
+              helperText: 'Suporta +, -, *, /',
             ),
           ),
 
@@ -238,14 +106,18 @@ class _GhostControlState extends State<GhostControl> {
 
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 55,
             child: ElevatedButton.icon(
-              onPressed: runInteractiveCalc,
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('CALCULAR E TRAZER RESULTADO'),
+              onPressed: _startTest,
+              icon: const Icon(Icons.play_circle_fill),
+              label: const Text('EXECUTAR TESTE E2E'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -254,52 +126,49 @@ class _GhostControlState extends State<GhostControl> {
           const Divider(),
           const SizedBox(height: 10),
 
-          const Text(
-            "Status / Resultado:",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
+          // Área de Status (Console Log Visual)
           Container(
-            padding: const EdgeInsets.all(10),
             width: double.infinity,
-            color: Colors.grey[200],
-            child: Text(status),
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "LOG DE EXECUÇÃO:",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(_status, style: const TextStyle(fontFamily: 'monospace')),
+              ],
+            ),
           ),
 
-          if (capturedResult.isNotEmpty) ...[
-            const SizedBox(height: 30),
-
-            // MOSTRAR O RESULTADO LIMPO EM DESTAQUE
+          // Exibição do Resultado Final
+          if (_finalResult.isNotEmpty && _finalResult != "Erro") ...[
+            const SizedBox(height: 20),
             const Text(
-              "RESULTADO FINAL:",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              "RESULTADO CAPTURADO:",
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
-              _extractCleanResult(
-                capturedResult.split(' | '),
-              ), // Usa nossa função de limpeza
+              _finalResult,
               style: const TextStyle(
                 fontSize: 60,
                 fontWeight: FontWeight.bold,
-                color: Colors.teal,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Log bruto (para provar que lemos a tela toda)
-            const Text(
-              "Log Bruto (Debug):",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            Container(
-              margin: const EdgeInsets.only(top: 5),
-              padding: const EdgeInsets.all(10),
-              width: double.infinity,
-              color: Colors.grey[200],
-              child: Text(
-                capturedResult,
-                style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                color: Colors.deepPurple,
               ),
             ),
           ],
