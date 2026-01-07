@@ -61,6 +61,10 @@ class MainActivity: FlutterActivity() {
                         result.error("INVALID_ACTION", "Ação '$actionName' desconhecida.", null)
                     }
                 }
+                "readScreen" -> {
+                    val texts = service.dumpScreenText()
+                    result.success(texts)
+                }
             }
         }
     }

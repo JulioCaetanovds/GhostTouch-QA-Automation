@@ -1,79 +1,104 @@
 # GhostTouch QA 👻
-![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=for-the-badge&logo=kotlin&logoColor=white) ![Android Native](https://img.shields.io/badge/Android-Native-3DDC84?style=for-the-badge&logo=android&logoColor=white) ![Automation](https://img.shields.io/badge/QA-Automation-FF6F00?style=for-the-badge&logo=selenium&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=for-the-badge&logo=kotlin&logoColor=white) ![Android Native](https://img.shields.io/badge/Android-Native-3DDC84?style=for-the-badge&logo=android&logoColor=white) ![QA Automation](https://img.shields.io/badge/SDET-Automation-FF6F00?style=for-the-badge&logo=selenium&logoColor=white)
 
-**GhostTouch QA** é uma **Prova de Conceito (PoC)** de um driver de automação mobile personalizado, desenvolvido do zero para demonstrar os princípios fundamentais por trás de ferramentas padrão da indústria como **Appium** e **Maestro**.
+> **GhostTouch QA** é uma Prova de Conceito (PoC) de um Driver de Automação Mobile "Black-box", desenvolvido para demonstrar como frameworks como Appium ou Maestro interagem com o Sistema Operacional em baixo nível.
 
-Este projeto preenche a lacuna entre frameworks de UI de alto nível (Flutter) e recursos de baixo nível do sistema operacional Android, utilizando **Serviços de Acessibilidade** para realizar testes de caixa preta (black-box), injeção de gestos e inspeção de elementos de UI sem a necessidade de acesso root ou instrumentação externa.
-
----
-
-## 🏗️ Arquitetura Técnica
-
-A arquitetura baseia-se em um padrão de **Native Bridge** para permitir a comunicação bidirecional entre o controlador de teste de alto nível (Flutter) e o driver de nível de SO (Android Accessibility Service).
-
-### 1. Comunicação Interprocessos (IPC)
-A comunicação é gerenciada via **MethodChannels**, estabelecendo uma ponte entre o runtime do Dart e a camada nativa em Kotlin.
-- **Canal**: `com.example.ghost_touch/accessibility`
-- O cliente Flutter envia payloads de comando (ex: `clickByText`, `globalAction`) que são organizados e recebidos por um `MethodCallHandler` no `MainActivity.kt`.
-
-### 2. Introspecção de Nós de Acessibilidade
-Em vez de depender de View IDs (que são frequentemente ofuscados em apps de produção), o GhostTouch implementa uma **Estratégia de Localizador Inteligente** percorrendo a árvore de **AccessibilityNodeInfo**.
-- **Travessia de Nós**: O serviço inspeciona o `rootInActiveWindow` para recuperar a hierarquia atual de nós da UI.
-- **Resolução de Elementos**: Busca recursivamente por nós que correspondam a atributos de texto específicos (comportamento tipo OCR) para identificar elementos interativos dinamicamente.
-- **Cálculo de Limites**: Uma vez que um nó é resolvido, o sistema extrai suas coordenadas de tela (`getBoundsInScreen`) para calcular o ponto central preciso para interação.
-
-### 3. Injeção de Gestos
-Para simular uma interação autêntica do usuário, a ferramenta ignora os cliques padrão de View e utiliza a **API `dispatchGesture`**.
-- **Movimento (Path Motion)**: Um objeto `Path` é construído para definir a trajetória do toque (X, Y).
-- **Descrição do Traço**: Um `GestureDescription` é construído, definindo a duração e a mecânica do toque ou deslizamento.
-- **Execução**: O gesto é despachado diretamente para a fila de eventos de entrada do SO, permitindo interagir com *qualquer* aplicativo, não apenas o app hospedeiro.
+Este projeto implementa um **Native Bridge** que permite ao Flutter controlar o Android Accessibility Service, possibilitando a execução de testes End-to-End (E2E) em aplicativos de terceiros sem acesso ao código-fonte ou instrumentação (APK debugging).
 
 ---
 
-## 🚀 Funcionalidades Chave
+## 📱 Case de Sucesso: Automação da Calculadora Android
 
-### 📍 Localizador Inteligente de Elementos
-Um mecanismo de localização robusto que encontra e interage com elementos baseados em seu texto visível. Isso imita o comportamento de um testador humano escaneando a tela por palavras-chave específicas, tornando os testes resilientes a mudanças de layout, desde que o conteúdo permaneça consistente.
+Para validar a robustez do driver, implementei um cenário de teste E2E complexo que interage com a Calculadora nativa do Android. O fluxo testa não apenas a interação (cliques), mas também a validação de dados (extração de texto) e navegação entre apps (multitasking).
 
-### 🤖 Scripting de Macro
-Suporta a execução de cenários complexos e multi-etapas. O método `runTestScript` demonstra um fluxo de ponta a ponta:
-1.  **Navegação do Sistema**: Força o dispositivo para a tela inicial (`GLOBAL_ACTION_HOME`).
-2.  **Lançamento de App**: Localiza e abre um aplicativo externo (ex: "Play Store") via Native Bridge.
-3.  **Estados de Espera**: Implementa atrasos assíncronos para lidar com tempos de carregamento do app.
-4.  **Encerramento (Tear Down)**: Retorna ao estado inicial usando gestos globais de voltar/home.
+![Demo do Projeto](assets/demo_calculator.gif)
+*(GIF de demonstração da automação rodando)*
 
-### 🔄 Controle Global do Sistema
-Controle direto sobre hardware e funções de nível de SO, gerenciando efetivamente o estado do "dispositivo sob teste".
-- **Home / Back / Recents**: Aciona ações globais de acessibilidade para navegar no sistema operacional fora do contexto do app.
+### 🔄 Fluxo Automatizado
+1.  **Input no App de Teste**: O usuário digita uma operação (ex: `15 * 3`) no app Flutter.
+2.  **Context Switching**: O driver envia o comando `GLOBAL_ACTION_HOME` e navega até a Calculadora.
+3.  **Black-box Interaction**:
+    *   Identifica os botões visualmente (pelo texto "1", "5", "×", "3").
+    *   Trata diferenças de plataforma (converte `*` para `×` e `-` para `−`).
+4.  **Validação (Assertion)**: Clica em `=` e faz um **Screen Scraping** da tela para ler o resultado.
+5.  **Round-trip**: Utiliza o menu `RECENTS` para retornar ao app GhostTouch QA e exibir o resultado extraído para asserção.
 
 ---
 
-## 🛠️ Configuração e Instalação
+## 🛠️ Destaques Técnicos (Under the Hood)
+
+### 1. Arquitetura Híbrida (Flutter + Native Kotlin)
+A comunicação entre a camada de teste (Dart) e o driver (Kotlin) é feita via **MethodChannels** bidirecionais, garantindo baixa latência na execução de comandos (IPC).
+
+### 2. Smart Locator & Exact Match Logic
+Um dos maiores desafios de usar `AccessibilityService` para automação é a desambiguidade. Um simples `findAccessibilityNodeInfosByText("2")` retornaria tanto o botão "2" quanto o visor exibindo "25".
+
+Implementei uma lógica de filtragem que prioriza "Nós Clicáveis" e "Match Exato" antes de flexibilizar a busca:
+
+```kotlin
+// Snippet simplificado da lógica de Locator no Kotlin
+fun clickByText(text: String): Boolean {
+    // 1. Busca todos os nós que contêm o texto
+    val list = rootNode.findAccessibilityNodeInfosByText(text)
+    
+    // 2. Filtra pelo match exato E clicável (evita falsos positivos em labels)
+    val exactMatch = list.firstOrNull { node ->
+        node.isClickable && node.text.toString().equals(text, ignoreCase = true)
+    }
+
+    // 3. Injeta o gesto no centro do elemento encontrado
+    val target = exactMatch ?: list.firstOrNull { it.isClickable }
+    if (target != null) {
+        val rect = Rect()
+        target.getBoundsInScreen(rect)
+        // Dispara o evento de toque no hardware (X, Y)
+        dispatchGesture(createTapPath(rect.centerX(), rect.centerY()), null, null)
+        return true
+    }
+    return false
+}
+```
+
+### 3. Screen Scraping (OCR-like)
+Para validação de testes (Assertions), o driver lê recursivamente toda a árvore de nós (`AccessibilityNodeInfo`) da janela ativa, extraindo textos de `TextViews`, `Buttons` e `EditTexts`. Isso permite validar o estado da tela sem depender de IDs fixos, crucial para testes *Black-box* em apps de terceiros.
+
+---
+
+## 🚀 Funcionalidades do Driver
+
+*   **📍 UI Location Strategy**: Busca dinâmica de elementos por texto visível (Testes resilientes a mudanças de layout).
+*   **👆 Gesture Injection**: Simulação de toques humanos via `dispatchGesture` API (não é clique sintético de View).
+*   **🔄 Global System Actions**: Controle total de hardware (Home, Back, Recents, Notifications).
+*   **🛡️ Flaky Tests Prevention**: Mecanismos de `retry` e `wait` implícitos no lado do cliente (Flutter) para lidar com animações do sistema.
+
+---
+
+## 💻 Como Executar
 
 > [!IMPORTANT]
-> Como este app atua como um Driver de Automação, ele requer **Permissões de Acessibilidade do Android** para funcionar.
+> Este projeto depende de permissões elevadas de Acessibilidade para injetar eventos de toque.
 
-1.  **Clone e Build**:
+1.  **Clone o repositório**:
     ```bash
-    git clone https://github.com/seuusuario/ghost-touch-qa.git
-    cd ghost-touch-qa
+    git clone https://github.com/seu-usuario/ghost-touch-qa.git
+    ```
+2.  **Execute o App**:
+    ```bash
     flutter run
     ```
-
-2.  **Ativar Serviço de Acessibilidade**:
-    *   Após instalar, navegue até **Configurações** > **Acessibilidade** no dispositivo.
-    *   Encontre **GhostTouch** na lista de serviços instalados.
-    *   **Ative (Toggle ON)** para conceder permissões de controle.
-    *   *Nota: Sem este passo, o `MethodChannel` retornará `SERVICE_OFF`.*
+3.  **Permissão Crítica**:
+    *   Ao abrir, o app solicitará ativação do serviço.
+    *   Vá em **Configurações > Acessibilidade > GhostTouch QA** e ative o serviço.
+    *   *Sem isso, o IPC retornará erro `SERVICE_OFF`.*
 
 ---
 
-## 💻 Tech Stack
+## 🔮 Próximos Passos (Roadmap)
 
-*   **Flutter (Dart)**: Interface de Controle e Orquestração de Testes.
-*   **Kotlin**: Implementação do Serviço Nativo Android.
-*   **Android Accessibility API**: Motor de automação principal (`AccessibilityService`, `AccessibilityNodeInfo`, `GestureDescription`).
+*   [ ] Implementar **Record & Replay**: Gravar as ações do usuário e gerar o script de teste automaticamente.
+*   [ ] Suporte a **Gestos Complexos**: Implementar Swipe/Scroll para lidar com ListViews infinitas (Scroll to find).
+*   [ ] Integração com CI/CD para rodar em emuladores headless.
 
 ---
 
-*Este projeto foi desenvolvido para demonstrar proficiência avançada em Arquitetura de Automação Mobile e desenvolvimento Android Nativo para cargos de Engenharia de QA.*
+*Projeto desenvolvido com foco em Engenharia de Qualidade e Arquitetura de Automação.*

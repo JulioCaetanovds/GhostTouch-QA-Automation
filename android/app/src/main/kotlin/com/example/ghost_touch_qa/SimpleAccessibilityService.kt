@@ -45,6 +45,27 @@ class SimpleAccessibilityService : AccessibilityService() {
         return performGlobalAction(actionId)
     }
 
+    // Função recursiva para ler TUDO na tela
+    fun dumpScreenText(): List<String> {
+        val rootNode = rootInActiveWindow ?: return emptyList()
+        val textList = mutableListOf<String>()
+        
+        collectText(rootNode, textList)
+        return textList
+    }
+
+    private fun collectText(node: android.view.accessibility.AccessibilityNodeInfo?, list: MutableList<String>) {
+        if (node == null) return
+
+        if (node.text != null && node.text.isNotEmpty()) {
+            list.add(node.text.toString())
+        }
+
+        for (i in 0 until node.childCount) {
+            collectText(node.getChild(i), list)
+        }
+    }
+
     companion object {
         var instance: SimpleAccessibilityService? = null
     }
@@ -52,10 +73,9 @@ class SimpleAccessibilityService : AccessibilityService() {
     fun clickByText(text: String): Boolean {
         Log.d("GhostTouch", "Procurando por texto: $text")
         
-        // Pega a janela ativa
         val rootNode = rootInActiveWindow ?: return false
         
-        // Busca todos os nós que contêm o texto (case insensitive)
+        // Busca TODOS os elementos que CONTÉM o texto
         val list = rootNode.findAccessibilityNodeInfosByText(text)
         
         if (list.isNullOrEmpty()) {
@@ -63,24 +83,42 @@ class SimpleAccessibilityService : AccessibilityService() {
             return false
         }
 
-        // Pega o primeiro elemento encontrado
-        val node = list[0]
+        // --- LÓGICA NOVA: PRIORIDADE PARA MATCH EXATO ---
         
-        // Descobre o retângulo (as bordas) desse elemento na tela
+        // 1. Tenta achar alguém que seja CLICÁVEL E tenha o texto EXATO (Igualzinho)
+        // Isso evita clicar no visor que tem "25 +" quando queremos só "2"
+        var targetNode = list.firstOrNull { node ->
+            val nodeText = node.text?.toString() ?: ""
+            val nodeDesc = node.contentDescription?.toString() ?: ""
+            
+            node.isClickable && (nodeText.equals(text, ignoreCase = true) || nodeDesc.equals(text, ignoreCase = true))
+        }
+
+        // 2. Se não achar exato, tenta achar apenas CLICÁVEL (Fallback)
+        if (targetNode == null) {
+             Log.d("GhostTouch", "Match exato não encontrado. Tentando match parcial...")
+             targetNode = list.firstOrNull { it.isClickable }
+        }
+
+        // 3. Se nem assim achar, desiste (ou pega o primeiro da lista se você quiser forçar)
+        if (targetNode == null) {
+             Log.d("GhostTouch", "Nenhum elemento clicável encontrado para '$text'.")
+             return false
+        }
+
         val rect = android.graphics.Rect()
-        node.getBoundsInScreen(rect)
+        targetNode.getBoundsInScreen(rect)
         
-        // Calcula o ponto central exato do elemento
         val centerX = rect.centerX().toFloat()
         val centerY = rect.centerY().toFloat()
 
-        Log.d("GhostTouch", "Elemento encontrado em: $rect. Clicando no centro: $centerX, $centerY")
+        Log.d("GhostTouch", "Alvo: '${targetNode.text}'. Rect: $rect. Clicando em: $centerX, $centerY")
         
-        // Reusa nossa função de clique por coordenada!
         click(centerX, centerY)
         
-        // Limpa a memória do nó (boa prática em acessibilidade)
-        node.recycle()
+        // Limpa a memória
+        list.forEach { it.recycle() }
+        
         return true
     }
 }
