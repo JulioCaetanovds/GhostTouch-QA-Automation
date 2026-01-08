@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'services/automation_driver.dart';
 import 'scripts/calculator_test.dart';
+import 'scripts/contacts_test.dart';
 
 void main() {
   runApp(const MyApp());
@@ -40,6 +41,7 @@ class _GhostControlState extends State<GhostControl> {
 
   String _status = "Pronto para testar.";
   String _finalResult = "";
+  String _selectedMode = "Calculadora"; // Modo padrão
 
   // Método chamado pelo botão
   Future<void> _startTest() async {
@@ -49,22 +51,31 @@ class _GhostControlState extends State<GhostControl> {
       _finalResult = "";
     });
 
-    // Instancia o Script de Teste injetando dependências
-    final testScript = CalculatorTest(
-      driver: _driver,
-      onStatusChanged: (newStatus) {
-        // Atualiza a UI a cada passo do script
-        setState(() => _status = newStatus);
-      },
-    );
-
-    // Roda o script e espera o resultado
-    final result = await testScript.run(_calcInputController.text.trim());
-
-    // Atualiza resultado final
-    setState(() {
-      _finalResult = result;
-    });
+    if (_selectedMode == "Calculadora") {
+      // --- MODO CALCULADORA ---
+      final testScript = CalculatorTest(
+        driver: _driver,
+        onStatusChanged: (newStatus) {
+          setState(() => _status = newStatus);
+        },
+      );
+      final result = await testScript.run(_calcInputController.text.trim());
+      setState(() {
+        _finalResult = result;
+      });
+    } else {
+      // --- MODO CONTATOS ---
+      final testScript = ContactsTest(
+        driver: _driver,
+        onStatusChanged: (newStatus) {
+          setState(() => _status = newStatus);
+        },
+      );
+      await testScript.run();
+      setState(() {
+        _finalResult = "Teste Fim";
+      });
+    }
   }
 
   @override
@@ -90,17 +101,44 @@ class _GhostControlState extends State<GhostControl> {
 
           const SizedBox(height: 30),
 
-          TextField(
-            controller: _calcInputController,
-            keyboardType:
-                TextInputType.visiblePassword, // Garante teclado completo
+          // --- SELETOR DE MODO ---
+          DropdownButtonFormField<String>(
+            value: _selectedMode,
             decoration: const InputDecoration(
-              labelText: 'Digite a conta (ex: 42*4)',
+              labelText: "Selecione o Cenário de Teste",
               border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.calculate),
-              helperText: 'Suporta +, -, *, /',
+              prefixIcon: Icon(Icons.layers),
             ),
+            items: const [
+              DropdownMenuItem(
+                value: "Calculadora",
+                child: Text("Calculadora (Math)"),
+              ),
+              DropdownMenuItem(
+                value: "Contatos",
+                child: Text("Agenda (Input Text)"),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedMode = value);
+              }
+            },
           ),
+          const SizedBox(height: 20),
+
+          // Mostra Input apenas se for Calculadora
+          if (_selectedMode == "Calculadora")
+            TextField(
+              controller: _calcInputController,
+              keyboardType: TextInputType.visiblePassword,
+              decoration: const InputDecoration(
+                labelText: 'Digite a conta (ex: 42*4)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.calculate),
+                helperText: 'Suporta +, -, *, /',
+              ),
+            ),
 
           const SizedBox(height: 20),
 

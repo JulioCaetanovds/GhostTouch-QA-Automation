@@ -43,4 +43,24 @@ class AutomationDriver {
     final List<dynamic> result = await _platform.invokeMethod('readScreen');
     return result;
   }
+
+  /// Insere texto no campo focado ou busca um campo editável
+  Future<void> inputText(String text) async {
+    await _platform.invokeMethod('inputText', {'text': text});
+  }
+
+  /// Clica em um elemento buscando pela descrição de conteúdo (acessibilidade)
+  Future<void> clickByDescription(String desc) async {
+    await _platform.invokeMethod('clickByDescription', {'desc': desc});
+  }
+
+  Future<bool> isAccessibilityServiceEnabled() async {
+    try {
+      final bool isEnabled = await _platform.invokeMethod('isServiceActive');
+      return isEnabled;
+    } catch (e) {
+      print("Erro ao verificar serviço: $e");
+      return false;
+    }
+  }
 }
