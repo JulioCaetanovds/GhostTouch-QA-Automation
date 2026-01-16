@@ -39,6 +39,12 @@ class _GhostControlState extends State<GhostControl> {
 
   final TextEditingController _calcInputController = TextEditingController();
 
+  @override
+  void dispose() {
+    _calcInputController.dispose();
+    super.dispose();
+  }
+
   String _status = "Pronto para testar.";
   String _finalResult = "";
   String _selectedMode = "Calculadora"; // Modo padrão
@@ -51,6 +57,8 @@ class _GhostControlState extends State<GhostControl> {
       _finalResult = "";
     });
 
+    if (!mounted) return;
+
     if (_selectedMode == "Calculadora") {
       // --- MODO CALCULADORA ---
       final testScript = CalculatorTest(
@@ -60,6 +68,7 @@ class _GhostControlState extends State<GhostControl> {
         },
       );
       final result = await testScript.run(_calcInputController.text.trim());
+      if (!mounted) return;
       setState(() {
         _finalResult = result;
       });
@@ -72,6 +81,7 @@ class _GhostControlState extends State<GhostControl> {
         },
       );
       await testScript.run();
+      if (!mounted) return;
       setState(() {
         _finalResult = "Teste Fim";
       });
@@ -103,7 +113,7 @@ class _GhostControlState extends State<GhostControl> {
 
           // --- SELETOR DE MODO ---
           DropdownButtonFormField<String>(
-            value: _selectedMode,
+            initialValue: _selectedMode,
             decoration: const InputDecoration(
               labelText: "Selecione o Cenário de Teste",
               border: OutlineInputBorder(),

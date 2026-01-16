@@ -33,13 +33,19 @@ class CalculatorTest {
       _updateStatus("Limpando tela anterior...");
       try {
         await driver.clickByText('AC');
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignored
+      }
       try {
         await driver.clickByText('C');
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignored
+      }
       try {
         await driver.clickByText('Limpar');
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignored
+      }
       await Future.delayed(const Duration(milliseconds: 500));
 
       // 3. Digita a conta
@@ -58,16 +64,17 @@ class CalculatorTest {
           await driver.clickByText(textToClick);
         } catch (e) {
           // Fallback de nomes
-          if (char == '*')
+          if (char == '*') {
             await driver.clickByText('Vezes');
-          else if (char == '/')
+          } else if (char == '/') {
             await driver.clickByText('Dividir');
-          else if (char == '-')
+          } else if (char == '-') {
             await driver.clickByText('Menos');
-          else if (char == '-')
+          } else if (char == '-') {
             await driver.clickByText('-');
-          else if (char == '+')
+          } else if (char == '+') {
             await driver.clickByText('Mais');
+          }
         }
         await Future.delayed(const Duration(milliseconds: 600));
       }
@@ -98,7 +105,9 @@ class CalculatorTest {
       try {
         await driver.clickByText('GhostTouch QA');
         voltou = true;
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignored
+      }
 
       if (!voltou) {
         try {

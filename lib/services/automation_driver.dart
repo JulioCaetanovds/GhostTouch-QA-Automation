@@ -59,6 +59,7 @@ class AutomationDriver {
       final bool isEnabled = await _platform.invokeMethod('isServiceActive');
       return isEnabled;
     } catch (e) {
+      // ignore: avoid_print
       print("Erro ao verificar serviço: $e");
       return false;
     }

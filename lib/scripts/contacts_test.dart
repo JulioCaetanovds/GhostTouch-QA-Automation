@@ -18,7 +18,9 @@ class ContactsTest {
     // Swipe Up para gaveta
     try {
       await driver.swipe(500, 1500, 500, 400);
-    } catch (e) {}
+    } catch (e) {
+      // Intentionally ignored
+    }
     await Future.delayed(const Duration(seconds: 2));
 
     try {
@@ -35,12 +37,17 @@ class ContactsTest {
         await driver.clickByDescription(t);
         addClicked = true;
         break;
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignored
+      }
     }
-    if (!addClicked)
+    if (!addClicked) {
       try {
         await driver.clickByText("Criar");
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignored
+      }
+    }
     await Future.delayed(const Duration(seconds: 2));
 
     // --- 3. PREENCHER NOME ---
@@ -51,12 +58,16 @@ class ContactsTest {
     try {
       await driver.clickByText("Nome");
       nameClicked = true;
-    } catch (e) {}
+    } catch (e) {
+      // Intentionally ignored
+    }
 
     if (!nameClicked) {
       try {
         await driver.clickByText("Primeiro nome");
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignored
+      }
     }
 
     await Future.delayed(const Duration(milliseconds: 500));
@@ -78,7 +89,9 @@ class ContactsTest {
     try {
       await driver.clickByText("Telefone");
       phoneClicked = true;
-    } catch (e) {}
+    } catch (e) {
+      // Intentionally ignored
+    }
 
     // Se o texto falhar, usa coordenada aproximada baseada no print (Campo logo abaixo do Nome)
     if (!phoneClicked) {
@@ -119,7 +132,9 @@ class ContactsTest {
     _updateStatus("Salvando...");
     try {
       await driver.clickByText('Salvar');
-    } catch (e) {}
+    } catch (e) {
+      // Intentionally ignored
+    }
 
     await Future.delayed(const Duration(seconds: 3));
 
