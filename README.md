@@ -11,7 +11,7 @@ Este projeto implementa um **Native Bridge** que permite ao Flutter controlar o 
 
 Para validar a robustez do driver, implementei um cenário de teste E2E complexo que interage com a Calculadora nativa do Android. O fluxo testa não apenas a interação (cliques), mas também a validação de dados (extração de texto) e navegação entre apps (multitasking).
 
-![Demo do Projeto](assets/demo_calculator.gif)
+<img src="assets/demo_calculator.gif" width="250" alt="Demo do Projeto">
 *(GIF de demonstração da automação rodando)*
 
 ### 🔄 Fluxo Automatizado
